@@ -57,7 +57,7 @@
 
 #define MMA7660_IIC_ADDR 	    0x98  
 #define MMA7660_REG_LEN         11
-#define MMA7660_RANGE						2000000
+#define MMA7660_RANGE						1500000
 #define MMA7660_PRECISION       6
 #define MMA7660_BOUNDARY        (0x1 << (MMA7660_PRECISION - 1))
 #define MMA7660_GRAVITY_STEP    MMA7660_RANGE/MMA7660_BOUNDARY
@@ -81,9 +81,23 @@ struct mma7660_data {
 };
 
 struct mma7660_axis {
-	int x;
-	int y;
-	int z;
+	long int x;
+	long int y;
+	long int z;
+};
+
+struct mma7660_axis_w {
+	long int x;
+	int xw;
+	long int y;
+	int yw;
+	long int z;
+	int zw;
+};
+
+struct temp {
+	long int v;
+	int w;
 };
 
 #define  GSENSOR_DEV_PATH    "/dev/mma7660_daemon"
