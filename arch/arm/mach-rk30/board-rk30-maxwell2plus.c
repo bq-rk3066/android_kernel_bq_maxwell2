@@ -150,6 +150,9 @@ int goodix811_init_platform_hw(void)
 {
 	struct regulator *ldo;
 	int ret;
+        rk30_mux_api_set(GPIO4D0_SMCDATA8_TRACEDATA8_NAME, GPIO4D_GPIO4D0);
+	rk30_mux_api_set(GPIO4C2_SMCDATA2_TRACEDATA2_NAME, GPIO4C_GPIO4C2);
+	pr_debug("%s:0x%x,0x%x\n",__func__,rk30_mux_api_get(GPIO4D0_SMCDATA8_TRACEDATA8_NAME),rk30_mux_api_get(GPIO4C2_SMCDATA2_TRACEDATA2_NAME));
 
 	if (TOUCH_ENABLE_PIN != INVALID_GPIO) {
 		ret = gpio_request(TOUCH_ENABLE_PIN, "goodix power pin");
