@@ -78,11 +78,7 @@
 #include <linux/mpu.h>
 #endif
 
-#if defined(CONFIG_BQ_MAXWELL2LITE)
-#include "board-rk30-maxwell2lite-camera.c"
-#else
-#include "board-rk30-maxwell2plus-camera.c"
-#endif
+#include "board-rk30-sdk-camera.c"
 
 #include <plat/key.h>
 static struct rk29_keys_button key_button[] = {
