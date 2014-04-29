@@ -98,7 +98,7 @@ extern int hdmi_get_hotplug(void);
 /* 
  *Turn on or off the transmission path. 
  */
-static void rockchip_snd_txctrl(struct rk29_i2s_info *i2s, int on)
+static void rockchip_snd_txctrl(struct rk29_i2s_info *i2s, int on, bool stopI2S)
 {
 	u32 opr,xfer,clr;
 	spin_lock(&i2s->spinlock_wr);
@@ -135,12 +135,14 @@ static void rockchip_snd_txctrl(struct rk29_i2s_info *i2s, int on)
 #endif			
 		)
 		{
-			xfer &= ~I2S_TX_TRAN_START;
-			xfer &= ~I2S_RX_TRAN_START;		
-			writel(xfer, &(pheadi2s->I2S_XFER));	
-			clr |= I2S_TX_CLEAR;
-			clr |= I2S_RX_CLEAR;
-			writel(clr, &(pheadi2s->I2S_CLR));
+			if(stopI2S){
+				xfer &= ~I2S_TX_TRAN_START;
+				xfer &= ~I2S_RX_TRAN_START;
+				writel(xfer, &(pheadi2s->I2S_XFER));
+				clr |= I2S_TX_CLEAR;
+				clr |= I2S_RX_CLEAR;
+				writel(clr, &(pheadi2s->I2S_CLR));
+			}
 			spin_unlock(&i2s->spinlock_wr);
 			udelay(1);
 			I2S_DBG("rockchip_snd_txctrl: stop xfer\n");			
@@ -150,7 +152,7 @@ static void rockchip_snd_txctrl(struct rk29_i2s_info *i2s, int on)
 	}
 }
 
-static void rockchip_snd_rxctrl(struct rk29_i2s_info *i2s, int on)
+static void rockchip_snd_rxctrl(struct rk29_i2s_info *i2s, int on, bool stopI2S)
 {
 	u32 opr,xfer,clr;
 	spin_lock(&i2s->spinlock_wr);
@@ -175,7 +177,7 @@ static void rockchip_snd_rxctrl(struct rk29_i2s_info *i2s, int on)
 		spin_unlock(&i2s->spinlock_wr);
 #ifdef CONFIG_SND_SOC_RT5631
 //bard 7-16 s
-		schedule_delayed_work(&rt5631_delay_cap,HZ/4);
+//		schedule_delayed_work(&rt5631_delay_cap,HZ/4);
 //bard 7-16 e
 #endif
 	}
@@ -191,12 +193,14 @@ static void rockchip_snd_rxctrl(struct rk29_i2s_info *i2s, int on)
 #endif			
 		)
 		{		
-			xfer &= ~I2S_RX_TRAN_START;
-			xfer &= ~I2S_TX_TRAN_START;		
-			writel(xfer, &(pheadi2s->I2S_XFER));		
-			clr |= I2S_RX_CLEAR;
-			clr |= I2S_TX_CLEAR;
-			writel(clr, &(pheadi2s->I2S_CLR));
+			if(stopI2S){
+				xfer &= ~I2S_RX_TRAN_START;
+				xfer &= ~I2S_TX_TRAN_START;
+				writel(xfer, &(pheadi2s->I2S_XFER));
+				clr |= I2S_RX_CLEAR;
+				clr |= I2S_TX_CLEAR;
+				writel(clr, &(pheadi2s->I2S_CLR));
+			}
 			spin_unlock(&i2s->spinlock_wr);
 			udelay(1);
 			I2S_DBG("rockchip_snd_rxctrl: stop xfer\n");				
@@ -333,6 +337,7 @@ static int rockchip_i2s_trigger(struct snd_pcm_substream *substream, int cmd, st
 	int ret = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct rk29_i2s_info *i2s = to_info(rtd->cpu_dai);
+	bool stopI2S = false;
 
 	I2S_DBG("Enter::%s----%d\n",__FUNCTION__,__LINE__);
 	switch (cmd) {
@@ -340,18 +345,19 @@ static int rockchip_i2s_trigger(struct snd_pcm_substream *substream, int cmd, st
         case SNDRV_PCM_TRIGGER_RESUME:
         case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:   
                 if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-	                rockchip_snd_rxctrl(i2s, 1);
+	                rockchip_snd_rxctrl(i2s, 1, stopI2S);
                 else
-	                rockchip_snd_txctrl(i2s, 1);
+	                rockchip_snd_txctrl(i2s, 1, stopI2S);
                 break;
         
         case SNDRV_PCM_TRIGGER_SUSPEND:
+                stopI2S = true;
         case SNDRV_PCM_TRIGGER_STOP:
         case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
                 if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-	                rockchip_snd_rxctrl(i2s, 0);
+	                rockchip_snd_rxctrl(i2s, 0, stopI2S);
                 else
-	                rockchip_snd_txctrl(i2s, 0);
+	                rockchip_snd_txctrl(i2s, 0, stopI2S);
                 break;
         default:
                 ret = -EINVAL;
@@ -629,8 +635,8 @@ static int rk29_i2s_probe(struct platform_device *pdev,
 
 	/* Mark ourselves as in TXRX mode so we can run through our cleanup
 	 * process without warnings. */
-	rockchip_snd_txctrl(i2s, 0);
-	rockchip_snd_rxctrl(i2s, 0);
+	rockchip_snd_txctrl(i2s, 0, true);
+	rockchip_snd_rxctrl(i2s, 0, true);
 
 	return 0;
 }
