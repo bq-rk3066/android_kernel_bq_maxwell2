@@ -947,6 +947,10 @@ struct rk29_sdmmc_platform_data default_sdmmc1_data = {
 
 #if defined (CONFIG_BATTERY_BQ24196)
 #define	CHG_EN	RK30_PIN4_PD5
+#define	CHG_INT       INVALID_GPIO
+#define 	DC_DET  	INVALID_GPIO
+#define 	BAT_LOW  	INVALID_GPIO
+#define	CHG_DET	INVALID_GPIO
 
 #ifdef CONFIG_BATTERY_BQ24196_OTG_MODE
 #define	OTG_EN	RK30_PIN6_PA0
@@ -956,29 +960,33 @@ static int bq24196_otg_irq_init(void)
 {
 	int ret = 0;
 
-	if(OTG_IRQ != INVALID_GPIO){
-		ret = gpio_request(OTG_IRQ, "otg_irq");
-		if(ret)
-			return ret;
+        rk30_mux_api_set(GPIO4D5_SMCDATA13_TRACEDATA13_NAME, GPIO4D_GPIO4D5);
+	rk30_mux_api_set(GPIO0D2_I2S22CHLRCKRX_SMCOEN_NAME, GPIO0D_GPIO0D2);
 
-		gpio_pull_updown(OTG_IRQ, GPIOPullUp);
-		gpio_direction_input(OTG_IRQ);
-	}
+	ret = gpio_request(OTG_IRQ, "otg_irq");
+	if(ret)
+		return ret;
 
-	if(STATU_IRQ != INVALID_GPIO){
-		ret = gpio_request(STATU_IRQ, "status_irq");
-		if(ret)
-			return ret;
+	gpio_pull_updown(OTG_IRQ, GPIOPullUp);
+	gpio_direction_input(OTG_IRQ);
 
-		gpio_pull_updown(STATU_IRQ, GPIOPullUp);
-		gpio_direction_input(STATU_IRQ);
-	}
+	ret = gpio_request(STATU_IRQ, "status_irq");
+	if(ret)
+		return ret;
+
+        gpio_pull_updown(STATU_IRQ, GPIOPullUp);
+	gpio_direction_input(STATU_IRQ);
+
 	return ret;
 }
 #endif
 
 struct bq24196_platform_data bq24196_info = {
 	.chg_en_pin=CHG_EN,
+        .bat_low_pin=BAT_LOW,
+	.dc_det_pin=DC_DET,
+	.chg_int_pin=CHG_INT,
+	.chg_det_pin=CHG_DET,
 #ifdef CONFIG_BATTERY_BQ24196_OTG_MODE
 	.otg_en_pin = OTG_EN,
 	.otg_irq_pin = OTG_IRQ,
@@ -990,6 +998,8 @@ struct bq24196_platform_data bq24196_info = {
 void bq24196_charge_en(void)
 {
 	int ret = 0;
+
+    rk29_mux_api_set(GPIO4D5_SMCDATA13_TRACEDATA13_NAME, GPIO4D_GPIO4D5);
 
 	if(CHG_EN != INVALID_GPIO){
 		ret = gpio_request(CHG_EN, "charge_en");
@@ -1012,6 +1022,8 @@ void bq24196_charge_en(void)
 void bq24196_charge_disable(void)
 {
 	int ret = 0;
+
+    rk29_mux_api_set(GPIO4D5_SMCDATA13_TRACEDATA13_NAME, GPIO4D_GPIO4D5);
 
 	if(CHG_EN != INVALID_GPIO){
 		ret = gpio_request(CHG_EN, "charge_en");
@@ -1047,13 +1059,16 @@ extern int bq24196_set_input_current(int);
 #define USB_SUPPORT	0
 #endif
 
+#ifdef CONFIG_BATTERY_RK30_USB_AND_CHARGE
+#define USB_DET_PIN	RK30_PIN6_PA5
+#else
 #define USB_DET_PIN	RK30_PIN6_PA3
+#endif
 #ifdef CONFIG_BATTERY_RK30_USB_AND_CHARGE
 #define CHARGE_TYPE_PIN	RK30_PIN6_PB2
 #else
 #define CHARGE_TYPE_PIN	INVALID_GPIO
 #endif
-
 void charge_current_set(int on)
 {
 	int ret = 0, value = 0;
@@ -1068,15 +1083,45 @@ void charge_current_set(int on)
 		value = gpio_get_value(charge_current_pin);
 		if(value != on){
 			gpio_direction_output(charge_current_pin, on);
+		//	printk("charge_current_set %s\n", on ? "2000mA" : "500mA");
 		}
 		gpio_free(charge_current_pin);
 	}
 }
 
+static int charge_en_init(void)
+{
+	int ret = 0;
+
+	rk30_mux_api_set(GPIO4D5_SMCDATA13_TRACEDATA13_NAME, GPIO4D_GPIO4D5);
+
+	ret = gpio_request(RK30_PIN4_PD5, NULL);
+	if (ret != 0)
+	{
+		gpio_free(RK30_PIN4_PD5);
+		printk(KERN_ERR "request charge en pin fail!\n");
+		return -1;
+	}
+	else
+	{
+		gpio_direction_output(RK30_PIN4_PD5, 0);
+		gpio_set_value(RK30_PIN4_PD5,  0);
+		gpio_free(RK30_PIN4_PD5);
+	}
+
+	return 0;
+}
+
 static struct rk30_adc_battery_platform_data rk30_adc_battery_platdata = {
-	.dc_det_pin      = DC_DET_PIN, // INVALID_GPIO,
+	.io_init	= charge_en_init,
+	.dc_det_pin      = DC_DET_PIN,//INVALID_GPIO,
 	.batt_low_pin    = INVALID_GPIO,
+#if !defined(CONFIG_BATTERY_BQ24196)
+	.charge_set_pin  = RK30_PIN4_PD5,
+#else
 	.charge_set_pin  = INVALID_GPIO,
+#endif
+	.charge_set_level = GPIO_LOW,
 	.charge_ok_pin   = RK30_PIN6_PA6,
 	.dc_det_level    = GPIO_LOW,
 	.charge_ok_level = GPIO_HIGH,
@@ -1084,16 +1129,17 @@ static struct rk30_adc_battery_platform_data rk30_adc_battery_platdata = {
 	.usb_det_level   = GPIO_LOW,
 	.back_light_pin = BL_EN_PIN,
 
-	.charging_sleep      = 0,
-	.save_capacity       = 1,
-	.is_reboot_charging  = 1,
-	.adc_channel         = 0,
+	.charging_sleep   = 0 ,
+	.save_capacity   = 1 ,
+	.is_reboot_charging = 1,
+	.adc_channel      = 0,
 	.spport_usb_charging = USB_SUPPORT,
 #if defined (CONFIG_BATTERY_BQ24196)
 	.control_usb_charging = bq24196_set_input_current,
 #else
 	.control_usb_charging = charge_current_set,
 #endif
+
 };
 
 static struct platform_device rk30_device_adc_battery = {
@@ -1102,6 +1148,60 @@ static struct platform_device rk30_device_adc_battery = {
         .dev	= {
                 .platform_data = &rk30_adc_battery_platdata,
         },
+};
+#endif
+
+#ifdef CONFIG_RK30_PWM_REGULATOR
+const static int pwm_voltage_map[] = {
+	950000,975000,1000000, 1025000, 1050000, 1075000, 1100000, 1125000, 1150000, 1175000, 1200000, 1225000, 1250000, 1275000, 1300000, 1325000, 1350000, 1375000, 1400000
+};
+
+static struct regulator_consumer_supply pwm_dcdc1_consumers[] = {
+	{
+		.supply = "vdd_core",
+	}
+};
+
+struct regulator_init_data pwm_regulator_init_dcdc[1] =
+{
+	{
+		.constraints = {
+			.name = "PWM_DCDC1",
+			.min_uV = 600000,
+			.max_uV = 1800000,	//0.6-1.8V
+			.apply_uV = true,
+			.valid_ops_mask = REGULATOR_CHANGE_STATUS | REGULATOR_CHANGE_VOLTAGE,
+		},
+		.num_consumer_supplies = ARRAY_SIZE(pwm_dcdc1_consumers),
+		.consumer_supplies = pwm_dcdc1_consumers,
+	},
+};
+
+static struct pwm_platform_data pwm_regulator_info[1] = {
+	{
+		.pwm_id = 3,
+		.pwm_gpio = RK30_PIN0_PD7,
+		.pwm_iomux_name = GPIO0D7_PWM3_NAME,
+		.pwm_iomux_pwm = GPIO0D_PWM3,
+		.pwm_iomux_gpio = GPIO0D_GPIO0D6,
+		.pwm_voltage = 1100000,
+		.suspend_voltage = 1050000,
+		.min_uV = 950000,
+		.max_uV	= 1400000,
+		.coefficient = 455,	//45.5%
+		.pwm_voltage_map = pwm_voltage_map,
+		.init_data	= &pwm_regulator_init_dcdc[0],
+	},
+};
+
+struct platform_device pwm_regulator_device[1] = {
+	{
+		.name = "pwm-voltage-regulator",
+		.id = 0,
+		.dev		= {
+			.platform_data = &pwm_regulator_info[0],
+		}
+	},
 };
 #endif
 
@@ -1164,60 +1264,6 @@ struct bq27541_platform_data bq27541_data = {
 	.dc_check_pin = BQ_DC_DET_PIN,
 	.init_dc_check_pin = bq24751_dc_detect_init,
 	.get_charging_stat = bq27541_charging_stat,
-};
-#endif
-
-#ifdef CONFIG_RK30_PWM_REGULATOR
-const static int pwm_voltage_map[] = {
-	950000,975000,1000000, 1025000, 1050000, 1075000, 1100000, 1125000, 1150000, 1175000, 1200000, 1225000, 1250000, 1275000, 1300000, 1325000, 1350000, 1375000, 1400000
-};
-
-static struct regulator_consumer_supply pwm_dcdc1_consumers[] = {
-	{
-		.supply = "vdd_core",
-	}
-};
-
-struct regulator_init_data pwm_regulator_init_dcdc[1] =
-{
-	{
-		.constraints = {
-			.name = "PWM_DCDC1",
-			.min_uV = 600000,
-			.max_uV = 1800000, // 0.6-1.8V
-			.apply_uV = true,
-			.valid_ops_mask = REGULATOR_CHANGE_STATUS | REGULATOR_CHANGE_VOLTAGE,
-		},
-		.num_consumer_supplies = ARRAY_SIZE(pwm_dcdc1_consumers),
-		.consumer_supplies = pwm_dcdc1_consumers,
-	},
-};
-
-static struct pwm_platform_data pwm_regulator_info[1] = {
-	{
-		.pwm_id = 3,
-		.pwm_gpio = RK30_PIN0_PD7,
-		.pwm_iomux_name = GPIO0D7_PWM3_NAME,
-		.pwm_iomux_pwm = GPIO0D_PWM3,
-		.pwm_iomux_gpio = GPIO0D_GPIO0D6,
-		.pwm_voltage = 1100000,
-		.suspend_voltage = 1050000,
-		.min_uV = 950000,
-		.max_uV	= 1400000,
-		.coefficient = 455, // 45.5%
-		.pwm_voltage_map = pwm_voltage_map,
-		.init_data = &pwm_regulator_init_dcdc[0],
-	},
-};
-
-struct platform_device pwm_regulator_device[1] = {
-	{
-		.name = "pwm-voltage-regulator",
-		.id = 0,
-		.dev = {
-		     .platform_data = &pwm_regulator_info[0],
-		}
-	},
 };
 #endif
 
@@ -1432,6 +1478,91 @@ void __sramfunc board_pmu_resume(void)
 	#endif
 }
 
+int __sramdata gpio0d7_iomux,gpio0d7_do,gpio0d7_dir,gpio0d7_en;
+
+void __sramfunc rk30_pwm_logic_suspend_voltage(void)
+{
+#ifdef CONFIG_RK30_PWM_REGULATOR
+	sram_udelay(10000);
+	gpio0d7_iomux = readl_relaxed(GRF_GPIO0D_IOMUX);
+	gpio0d7_do = grf_readl(GRF_GPIO0H_DO);
+	gpio0d7_dir = grf_readl(GRF_GPIO0H_DIR);
+	gpio0d7_en = grf_readl(GRF_GPIO0H_EN);
+
+	writel_relaxed((1<<30), GRF_GPIO0D_IOMUX);
+	grf_writel((1<<31)|(1<<15), GRF_GPIO0H_DIR);
+	grf_writel((1<<31)|(1<<15), GRF_GPIO0H_DO);
+	grf_writel((1<<31)|(1<<15), GRF_GPIO0H_EN);
+#endif 
+}
+
+void __sramfunc rk30_pwm_logic_resume_voltage(void)
+{
+#ifdef CONFIG_RK30_PWM_REGULATOR
+	writel_relaxed((1<<30)|gpio0d7_iomux, GRF_GPIO0D_IOMUX);
+	grf_writel((1<<31)|gpio0d7_en, GRF_GPIO0H_EN);
+	grf_writel((1<<31)|gpio0d7_dir, GRF_GPIO0H_DIR);
+	grf_writel((1<<31)|gpio0d7_do, GRF_GPIO0H_DO);
+	sram_udelay(10000);
+
+#endif
+}
+
+extern void pwm_suspend_voltage(void);
+extern void pwm_resume_voltage(void);
+void  rk30_pwm_suspend_voltage_set(void)
+{
+#ifdef CONFIG_RK30_PWM_REGULATOR
+	pwm_suspend_voltage();
+#endif
+}
+void  rk30_pwm_resume_voltage_set(void)
+{
+#ifdef CONFIG_RK30_PWM_REGULATOR
+	pwm_resume_voltage();
+#endif
+}
+
+u32 gpio1a_iomux,gpio2c_iomux, gpio1b_pull,gpio2d_pull, gpio1b_dir,gpio2d_dir,gpio1b_en, gpio2d_en;
+void board_gpio_suspend(void) {
+	
+	gpio1a_iomux = readl_relaxed(GRF_GPIO1A_IOMUX);
+	gpio2c_iomux = readl_relaxed(GRF_GPIO2C_IOMUX);
+	writel_relaxed((0xf<< 26), GRF_GPIO1A_IOMUX);
+	writel_relaxed((0x3 <<18), GRF_GPIO2C_IOMUX);
+
+	gpio1b_pull =  grf_readl(GRF_GPIO1L_PULL);
+	gpio2d_pull =  grf_readl(GRF_GPIO2H_PULL);
+	grf_writel(gpio1b_pull |(0x3<<21)|(0x3<<5),GRF_GPIO1L_PULL);	
+	grf_writel( gpio2d_pull | (0x1<<17) |(0x1<<1),GRF_GPIO2H_PULL);
+	
+	gpio1b_dir =  grf_readl(GRF_GPIO1L_DIR);
+	gpio2d_dir =  grf_readl(GRF_GPIO2H_DIR);
+	grf_writel(gpio1b_dir |(0x1<<21),GRF_GPIO1L_DIR);	
+	grf_writel(gpio2d_dir | (0x1<<17) ,GRF_GPIO2H_DIR);
+
+	gpio1b_en =  grf_readl(GRF_GPIO1L_EN);
+	gpio2d_en =  grf_readl(GRF_GPIO2H_EN);
+	grf_writel( gpio1b_en |(0x3<<21)|(0x3<<5),GRF_GPIO1L_EN);	
+	grf_writel( gpio2d_en | (0x1<<17) |(0x1<<1),GRF_GPIO2H_EN);
+	
+}
+ void board_gpio_resume(void) {
+
+	writel_relaxed(0xffff0000|gpio1a_iomux, GRF_GPIO1A_IOMUX);
+	writel_relaxed(0xffff0000|gpio2c_iomux, GRF_GPIO2C_IOMUX);
+	
+	grf_writel( 0xffff0000|gpio1b_pull,GRF_GPIO1L_PULL);
+	grf_writel( 0xffff0000|gpio2d_pull,GRF_GPIO2H_PULL);
+
+	grf_writel( 0xffff0000|gpio1b_dir,GRF_GPIO1L_DIR);
+	grf_writel( 0xffff0000|gpio2d_dir,GRF_GPIO2H_DIR);
+
+	grf_writel( 0xffff0000|gpio1b_en,GRF_GPIO1L_EN);
+	grf_writel( 0xffff0000|gpio2d_en,GRF_GPIO2H_EN);
+	
+}
+
 #ifdef CONFIG_I2C2_RK30
 static struct i2c_board_info __initdata i2c2_info[] = {
 #if defined(CONFIG_TOUCHSCREEN_GT811_BQ)
@@ -1588,7 +1719,9 @@ static void __init machine_rk30_board_init(void)
 	spi_register_board_info(board_spi_devices, ARRAY_SIZE(board_spi_devices));
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 	rk_platform_add_display_devices();
-	board_usb_detect_init(RK30_PIN6_PA3);
+	#if defined(CONFIG_BATTERY_RK30_ADC_FAC)
+	board_usb_detect_init(USB_DET_PIN);
+        #endif
 
 #if defined(CONFIG_WIFI_CONTROL_FUNC)
 	rk29sdk_wifi_bt_gpio_control_init();
@@ -1626,29 +1759,61 @@ static void __init rk30_reserve(void)
  * @logic_volt	: logic voltage arm requests depend on frequency
  * comments	: min arm/logic voltage
  */
+#if 0
 static struct dvfs_arm_table dvfs_cpu_logic_table[] = {
-	{.frequency = 252 * 1000,	.cpu_volt = 1075 * 1000,	.logic_volt = 1125 * 1000}, // 0.975V/1.000V
-	{.frequency = 504 * 1000,	.cpu_volt = 1100 * 1000,	.logic_volt = 1125 * 1000}, // 0.975V/1.000V
-	{.frequency = 816 * 1000,	.cpu_volt = 1125 * 1000,	.logic_volt = 1150 * 1000}, // 1.000V/1.025V
-	{.frequency = 1008 * 1000,	.cpu_volt = 1125 * 1000,	.logic_volt = 1150 * 1000}, // 1.025V/1.050V
-	{.frequency = 1200 * 1000,	.cpu_volt = 1175 * 1000,	.logic_volt = 1200 * 1000}, // 1.100V/1.050V
-	{.frequency = 1272 * 1000,	.cpu_volt = 1225 * 1000,	.logic_volt = 1200 * 1000}, // 1.150V/1.100V
-	{.frequency = 1416 * 1000,	.cpu_volt = 1300 * 1000,	.logic_volt = 1200 * 1000}, // 1.225V/1.100V
-	{.frequency = 1512 * 1000,	.cpu_volt = 1350 * 1000,	.logic_volt = 1250 * 1000}, // 1.300V/1.150V
-	{.frequency = 1608 * 1000,	.cpu_volt = 1425 * 1000,	.logic_volt = 1300 * 1000}, // 1.325V/1.175V
+	{.frequency = 252 * 1000,	.cpu_volt = 1075 * 1000,	.logic_volt = 1125 * 1000},//0.975V/1.000V
+	{.frequency = 504 * 1000,	.cpu_volt = 1100 * 1000,	.logic_volt = 1125 * 1000},//0.975V/1.000V
+	{.frequency = 816 * 1000,	.cpu_volt = 1125 * 1000,	.logic_volt = 1150 * 1000},//1.000V/1.025V
+	{.frequency = 1008 * 1000,	.cpu_volt = 1125 * 1000,	.logic_volt = 1150 * 1000},//1.025V/1.050V
+	{.frequency = 1200 * 1000,	.cpu_volt = 1175 * 1000,	.logic_volt = 1200 * 1000},//1.100V/1.050V
+	{.frequency = 1272 * 1000,	.cpu_volt = 1225 * 1000,	.logic_volt = 1200 * 1000},//1.150V/1.100V
+	{.frequency = 1416 * 1000,	.cpu_volt = 1300 * 1000,	.logic_volt = 1200 * 1000},//1.225V/1.100V
+	{.frequency = 1512 * 1000,	.cpu_volt = 1350 * 1000,	.logic_volt = 1250 * 1000},//1.300V/1.150V
+	{.frequency = 1608 * 1000,	.cpu_volt = 1425 * 1000,	.logic_volt = 1300 * 1000},//1.325V/1.175V
 	{.frequency = CPUFREQ_TABLE_END},
 };
+#else
+static struct dvfs_arm_table dvfs_cpu_logic_table[] = {
+    {.frequency = 252 * 1000, .cpu_volt = 1100 * 1000, .logic_volt = 1125 * 1000},//0.975V/1.000V
+    {.frequency = 504 * 1000, .cpu_volt = 1100 * 1000, .logic_volt = 1125* 1000},//0.975V/1.000V
+    {.frequency = 816 * 1000, .cpu_volt = 1125 * 1000, .logic_volt = 1150 * 1000},//1.000V/1.025V
+    {.frequency = 1008 * 1000, .cpu_volt = 1150 * 1000, .logic_volt = 1150 * 1000},//1.025V/1.050V
+    {.frequency = 1200 * 1000, .cpu_volt = 1200 * 1000, .logic_volt = 1200 * 1000},//1.100V/1.050V
+    {.frequency = 1272 * 1000, .cpu_volt = 1250 * 1000, .logic_volt = 1200 * 1000},//1.150V/1.100V
+    {.frequency = 1416 * 1000, .cpu_volt = 1325 * 1000, .logic_volt = 1225 * 1000},//1.225V/1.100V
+    {.frequency = 1512 * 1000, .cpu_volt = 1375 * 1000, .logic_volt = 1250 * 1000},//1.300V/1.150V
+    {.frequency = 1608 * 1000, .cpu_volt = 1450 * 1000, .logic_volt = 1325 * 1000},//1.325V/1.175V
+    {.frequency = CPUFREQ_TABLE_END},};
 
-static struct cpufreq_frequency_table dvfs_gpu_table[] = {
+#endif
+#ifdef CONFIG_GPU_SUPPORT_266M
+struct cpufreq_frequency_table dvfs_gpu_table[] = {
+	{.frequency = 266 * 1000,	.index = 1050 * 1000},
+	{.frequency = CPUFREQ_TABLE_END},
+};
+int gpu_freq_max = 266;
+#else
+struct cpufreq_frequency_table dvfs_gpu_table[] = {
 	{.frequency = 266 * 1000,	.index = 1050 * 1000},
 	{.frequency = 400 * 1000,	.index = 1275 * 1000},
 	{.frequency = CPUFREQ_TABLE_END},
 };
+int gpu_freq_max = 400;
+#endif
 
+struct cpufreq_frequency_table dvfs_gpu_table_266[] = {
+	{.frequency = 266 * 1000,	.index = 1050 * 1000},
+	{.frequency = CPUFREQ_TABLE_END},
+};
+
+struct cpufreq_frequency_table dvfs_gpu_table_400[] = {
+	{.frequency = 266 * 1000,	.index = 1050 * 1000},
+	{.frequency = 400 * 1000,	.index = 1275 * 1000},
+	{.frequency = CPUFREQ_TABLE_END},
+};
 static struct cpufreq_frequency_table dvfs_ddr_table[] = {
-	{.frequency = 200 * 1000 + DDR_FREQ_SUSPEND,	.index = 1050 * 1000},
-	{.frequency = 300 * 1000 + DDR_FREQ_VIDEO,	.index = 1050 * 1000},
-	{.frequency = 400 * 1000 + DDR_FREQ_NORMAL,	.index = 1125 * 1000},
+	{.frequency = 300 * 1000,	.index = 1050 * 1000},
+	{.frequency = 400 * 1000,	.index = 1125 * 1000},
 	{.frequency = CPUFREQ_TABLE_END},
 };
 

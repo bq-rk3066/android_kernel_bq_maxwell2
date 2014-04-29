@@ -242,6 +242,7 @@ int bq24196_set_input_current(int on)
 }
 EXPORT_SYMBOL_GPL(bq24196_set_input_current);
 
+
 static int bq24196_update_charge_mode(u8 value)
 {
 	int ret = 0;
@@ -357,7 +358,7 @@ static irqreturn_t otg_irq_handler(int irq, void *dev_id)
 static irqreturn_t status_irq_handler(int irq, void *dev_id);
 static void status_irq_wakeup(struct work_struct *work);
 static DECLARE_DELAYED_WORK(status_irq_work, status_irq_wakeup);
-
+static int status_irq_delay = 0;
 static void status_irq_wakeup(struct work_struct *work)
 	{
 		DBG("%s\n", __func__);
@@ -369,7 +370,8 @@ static void status_irq_wakeup(struct work_struct *work)
 				bq24196_mode = 0;
 				otg_flag = 1;
 				DBG("OTG over current\n");
-				schedule_delayed_work(&status_irq_work, msecs_to_jiffies(1000));
+				status_irq_delay = 1000;
+				schedule_delayed_work(&status_irq_work, msecs_to_jiffies(status_irq_delay));
 			}
 		}else{
 			if((1 == gpio_get_value(bq24196_pdata->otg_irq_pin)) && (otg_flag == 1))
@@ -410,8 +412,13 @@ static irqreturn_t status_irq_handler(int irq, void *dev_id)
 {
 	DBG("%s\n", __func__);
 	//mod_timer(&bq24196_di->timer, jiffies + msecs_to_jiffies(100));
-	cancel_delayed_work(&status_irq_work);
-	schedule_delayed_work(&status_irq_work, 100);
+	if(status_irq_delay == 1000)
+	{
+		cancel_delayed_work(&status_irq_work);
+	}
+	status_irq_delay = 100;
+	schedule_delayed_work(&status_irq_work, msecs_to_jiffies(status_irq_delay));
+
 	return IRQ_HANDLED;
 }
 
@@ -444,6 +451,7 @@ static int bq24196_battery_probe(struct i2c_client *client,
 		gpio_pull_updown(pdata->otg_en_pin, GPIOPullDown);
 		gpio_direction_output(pdata->otg_en_pin, 0);
 	}
+
 
 	di = kzalloc(sizeof(*di), GFP_KERNEL);
 	if (!di) {
@@ -517,11 +525,9 @@ static int bq24196_battery_shutdown(struct i2c_client *client)
 	free_irq(gpio_to_irq(bq24196_pdata->status_irq_pin), NULL);
 	free_irq(gpio_to_irq(bq24196_pdata->otg_irq_pin), NULL);
 
-	if(bq24196_mode == 1)
-	{
-		gpio_direction_output(bq24196_pdata->otg_en_pin, 0);
-		bq24196_update_charge_mode(CHARGE_MODE_CONFIG_CHARGE_BATTERY);
-	}
+	gpio_direction_output(bq24196_pdata->otg_en_pin, 0);
+	bq24196_update_charge_mode(CHARGE_MODE_CONFIG_CHARGE_BATTERY);
+	mdelay(100);
 #endif
 }
 static int bq24196_battery_remove(struct i2c_client *client)

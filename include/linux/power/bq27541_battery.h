@@ -8,6 +8,7 @@ struct bq27541_platform_data {
 	int wake_irq;
 	unsigned int interval;
 	unsigned int dc_check_pin;
+	unsigned int usb_check_pin;
 	unsigned int bat_check_pin;
 	unsigned int chgok_check_pin;
 	unsigned int bat_num;

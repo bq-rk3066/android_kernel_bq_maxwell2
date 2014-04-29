@@ -365,7 +365,6 @@ static int rk30_adc_battery_status_samples(struct rk30_adc_battery_data *bat)
 				bat->bat_status = POWER_SUPPLY_STATUS_CHARGING;
 			}
 			else{
-	//检测到充电满电平标志
 				bat->full_times++;
 
 				if (bat->full_times >= NUM_CHARGE_FULL_DELAY_TIMES) {

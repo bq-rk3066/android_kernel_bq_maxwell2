@@ -30,42 +30,31 @@
 //unsigned int   pre_cnt = 0;   //for long press counter 
 //int charge_disp_mode = 0;
 static int pwr_on_thrsd = 5;          //power on capcity threshold
-#ifdef CONFIG_BATTERY_RK30_ADC_FAC
-extern bool low_usb_charging(void);
 int charging_flag = 0;
 extern void rk30_power_supply_changed(void);
-
-//extern int boot_mode_init(char * s);
 #ifdef CONFIG_BATTERY_RK30_USB_AND_CHARGE
 #define DC_DET_GPIO		INVALID_GPIO
 #else
-#define DC_DET_GPIO		RK30_PIN0_PB2
+#define DC_DET_GPIO		RK30_PIN6_PA5
 #endif
-#define USB_DET_GPIO	RK30_PIN0_PA7
-#endif
-
-#ifdef CONFIG_CW2015_BATTERY
-extern bool low_usb_charging(void);
-
-#ifdef CONFIG_BATTERY_AC_CHARGE
-#define DC_DET_GPIO		RK30_PIN0_PB2
-#else
-#define DC_DET_GPIO		INVALID_GPIO
-#endif
-
-#ifdef CONFIG_BATTERY_USB_CHARGE
-#define USB_DET_GPIO		RK30_PIN0_PA7
-#else
-#define USB_DET_GPIO		INVALID_GPIO
-#endif
-#endif
-
+#define USB_DET_GPIO	RK30_PIN6_PA3
 static struct workqueue_struct *wq_charge_test;
 static struct delayed_work delaywork_charge_test;
+//extern int board_boot_mode(void);
+//extern int boot_mode_init(char * s);
+extern bool low_usb_charging(void);
+extern bool is_accharging(void);
 extern bool is_usbcharging(void);
+extern void kernel_power_off(void);
+int __weak get_boot_source(void){}
+#ifdef CONFIG_RK29_SUPPORT_MODEM
+extern int rk30_set_modem_suspend(void);
+#endif
 #if defined(CONFIG_CHARGER_LIMITED_BY_TEMP)
 int check_charge_ok = 0;
 #endif
+
+LIST_HEAD(rk_psy_head);  //add by yxj for charge logo display  boot_command_line
 static int __init pwr_on_thrsd_setup(char *str)
 {
 
@@ -75,7 +64,30 @@ static int __init pwr_on_thrsd_setup(char *str)
 }
 
 __setup("pwr_on_thrsd=", pwr_on_thrsd_setup);
-
+static void charge_test_timer(struct work_struct *work)
+{
+#ifdef CONFIG_BATTERY_RK30_USB_AND_CHARGE
+		if(1 == gpio_get_value(USB_DET_GPIO)){
+			charging_flag = 1;
+			msleep(10);
+			rk30_power_supply_changed();
+		}else
+			queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
+#else
+		//when connect usb and dc all ,continue the delaywork
+		if((0 == gpio_get_value(USB_DET_GPIO)) && (0 == gpio_get_value(DC_DET_GPIO)))
+			queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
+		else{
+			//when disconnect usb or dc,power off immediately
+			if((1 == gpio_get_value(USB_DET_GPIO)) ^ (0 == gpio_get_value(DC_DET_GPIO))){
+				charging_flag = 1;
+				msleep(10);
+				rk30_power_supply_changed();
+			}else
+				queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
+		}
+#endif
+}
 static int usb_status;
 static int ac_status;
 static int __rk_get_system_battery_status(struct device *dev, void *data)
@@ -91,7 +103,7 @@ static int __rk_get_system_battery_status(struct device *dev, void *data)
 		if (psy->type == POWER_SUPPLY_TYPE_MAINS)
 			ac_status = POWER_SUPPLY_TYPE_MAINS;
 	}
-	DBG("psy->type = %d, usb_status = %d, ac_status =%d\n", psy->type, usb_status, ac_status);
+
 	return 0;
 }
 
@@ -132,55 +144,6 @@ EXPORT_SYMBOL(rk_get_system_battery_capacity);
 
 #ifdef CONFIG_POWER_ON_CHARGER_DISPLAY
 //int charger_mode=0;	     	//1:charge,0:not charge
-
-static void charge_test_timer(struct work_struct *work)
-{
-#ifdef CONFIG_BATTERY_RK30_ADC_FAC
-#if defined(CONFIG_BATTERY_RK30_USB_AND_CHARGE)
-		if(1 == gpio_get_value(USB_DET_GPIO)){
-			charging_flag = 1;
-			msleep(10);
-			rk30_power_supply_changed();
-		}else
-			queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
-#else
-		//when connect usb and dc all ,continue the delaywork
-		if((0 == gpio_get_value(USB_DET_GPIO)) && (0 == gpio_get_value(DC_DET_GPIO)))
-			queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
-		else{
-			//when disconnect usb or dc,power off immediately
-			if((1 == gpio_get_value(USB_DET_GPIO)) ^ (0 == gpio_get_value(DC_DET_GPIO))){
-				charging_flag = 1;
-				msleep(10);
-				rk30_power_supply_changed();
-			}else
-				queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
-		}
-#endif
-#endif
-
-#ifdef CONFIG_CW2015_BATTERY
-#if !defined(CONFIG_BATTERY_AC_CHARGE)
-		if(1 == gpio_get_value(USB_DET_GPIO))
-			kernel_power_off();
-		else
-			queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
-#else
-		//when connect usb and dc all ,continue the delaywork
-		if((0 == gpio_get_value(USB_DET_GPIO)) && (0 == gpio_get_value(DC_DET_GPIO)))
-			queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
-		else{
-			//when disconnect usb or dc,power off immediately
-			if((1 == gpio_get_value(USB_DET_GPIO)) ^ (0 == gpio_get_value(DC_DET_GPIO)))
-				kernel_power_off();
-			else
-				queue_delayed_work(wq_charge_test,&delaywork_charge_test,msecs_to_jiffies(TIMER_MS_COUNTS));
-		}
-#endif
-#endif
-
-}
-
 static void add_bootmode_charger_to_cmdline(void)
 {
 	wq_charge_test= create_singlethread_workqueue("charger_test");
@@ -208,7 +171,8 @@ static int  __init start_charge_logo_display(void)
 {
 	union power_supply_propval val_status = {POWER_SUPPLY_STATUS_DISCHARGING};
 	union power_supply_propval val_capacity ={ 100} ;
-
+	struct power_supply *psy;
+	int online = 0;
 	printk("start_charge_logo_display\n");
 
 	if(board_boot_mode() == BOOT_MODE_RECOVERY)  //recovery mode
@@ -218,10 +182,20 @@ static int  __init start_charge_logo_display(void)
 
 	}
 
-	if (rk_get_system_battery_status() != POWER_SUPPLY_TYPE_BATTERY)
-		val_status.intval = POWER_SUPPLY_STATUS_CHARGING;
+	list_for_each_entry(psy, &rk_psy_head, rk_psy_node)
+	{
+		psy->get_property(psy,POWER_SUPPLY_PROP_ONLINE,&val_status);
 
-	val_capacity.intval = rk_get_system_battery_capacity();
+		if (val_status.intval != 0) {
+			if ((psy->type == POWER_SUPPLY_TYPE_USB) || (psy->type == POWER_SUPPLY_TYPE_MAINS))
+				online++;
+		}
+
+		psy->get_property(psy,POWER_SUPPLY_PROP_CAPACITY,&val_capacity); 
+	}
+
+	if(online >= 1)
+		val_status.intval = POWER_SUPPLY_STATUS_CHARGING;
 
 	// low power   and  discharging
 #if 0
@@ -252,24 +226,30 @@ static int  __init start_charge_logo_display(void)
 
 #endif
 
+	if( (get_boot_source() == 2) && //dc boot
+		(val_status.intval != POWER_SUPPLY_STATUS_CHARGING ) && //pull out dc
+		(board_boot_mode() != BOOT_MODE_REBOOT) )//not reboot mode
+	{
+		printk("boot from dc ,now pull out dc,so kernel_power_off \n ");
+		kernel_power_off();
+	}
+
 	if(val_status.intval == POWER_SUPPLY_STATUS_CHARGING)
 	{
-#if defined(CONFIG_BATTERY_RK30_ADC_FAC) || defined(CONFIG_CW2015_BATTERY)
-		if ((board_boot_mode() != BOOT_MODE_REBOOT) || low_usb_charging())  //do not enter power on charge mode when soft  reset
-#else
-		if (board_boot_mode() != BOOT_MODE_REBOOT)
-#endif
-	    {			
+		if((board_boot_mode() != BOOT_MODE_REBOOT) || (low_usb_charging()))	//do not enter power on charge mode when soft  reset
+	    {
+	        if(is_accharging() || is_usbcharging())	//check is charging mode
 			add_bootmode_charger_to_cmdline();
+			#ifdef CONFIG_RK29_SUPPORT_MODEM
+			rk30_set_modem_suspend();
+			#endif
 			//boot_mode_init("charge");
 			printk("power in charge mode\n");
 		}
 	}
-
 #if defined(CONFIG_CHARGER_LIMITED_BY_TEMP)
-	 check_charge_ok = 1;
+	check_charge_ok = 1;
 #endif
-
 	return 0;
 } 
 
