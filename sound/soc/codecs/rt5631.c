@@ -2307,6 +2307,7 @@ static int rt5631_probe(struct snd_soc_codec *codec)
 	bool is_spk = !((rt5631_read(codec, 0x4a)) & 0x04);	//detect rt5631 reg4a[3], 0'b:SPK, 1'b:HP ;
 #else
 	bool is_spk = (rt5631_read(codec, 0x4a)) & 0x04;	//detect rt5631 reg4a[3], 1'b:SPK, 0'b:HP ;
+#endif
 	switch_set_state(&g_rt5631->headset_sdev,( (is_spk == false) ? 1 : 0));
 /*
 //bard 7-16 s
