@@ -116,7 +116,11 @@
 //refer to file /arch/arm/mach-rk30/include/mach/Iomux.h
 //define reset-pin
 #define RK29SDK_SD_CARD_DETECT_N                RK30_PIN3_PB6  //According to your own project to set the value of card-detect-pin.
+#if defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2PLUS)
+#define RK29SDK_SD_CARD_INSERT_LEVEL            GPIO_HIGH        // set the voltage of insert-card. Please pay attention to the default setting.
+#else
 #define RK29SDK_SD_CARD_INSERT_LEVEL            GPIO_LOW         // set the voltage of insert-card. Please pay attention to the default setting.
+#endif
 #define RK29SDK_SD_CARD_DETECT_PIN_NAME         GPIO3B6_SDMMC0DETECTN_NAME
 #define RK29SDK_SD_CARD_DETECT_IOMUX_FGPIO      GPIO3B_GPIO3B6
 #define RK29SDK_SD_CARD_DETECT_IOMUX_FMUX       GPIO3B_SDMMC0_DETECT_N

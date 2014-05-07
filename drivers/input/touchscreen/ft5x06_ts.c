@@ -374,27 +374,22 @@ FTS_BOOL byte_read(FTS_BYTE* pbt_buf, FTS_BYTE bt_len)
 
 static unsigned char CTPM_FW[]=
 {
-  #include "ft_app-ba.h"
-};
-
-static unsigned char CTPM_FW1[]=
-{
-  #include "ft_app-91.h"
+  #include "ft_app-78.h"
 };
 
 static unsigned char CTPM_FW2[]=
 {
-  #include "ft_app-08.h"
+  #include "ft_app-24.h"
 };
 
 static unsigned char CTPM_FW3[]=
 {
-  #include "ft_app-19.h"
+  #include "ft_app-58.h"
 };
 
 static unsigned char CTPM_FW4[]=
 {
-  #include "ft_app-59.h"
+  #include "ft_app-17.h"
 };
 
 E_UPGRADE_ERR_TYPE  fts_ctpm_fw_upgrade(FTS_BYTE* pbt_buf, FTS_DWRD dw_lenth)
@@ -638,29 +633,6 @@ int fts_ctpm_fw_upgrade_with_i_file(void)
    return i_ret;
 }
 
-int fts_ctpm_fw_upgrade_with_i_file1(void)
-{
-   FTS_BYTE*     pbt_buf = FTS_NULL;
-   int i_ret;
-
-   //=========FW upgrade========================*/
-   pbt_buf = CTPM_FW1;
-   /*call the upgrade function*/
-   i_ret =  fts_ctpm_fw_upgrade(pbt_buf,sizeof(CTPM_FW1));
-   if (i_ret != 0)
-   {
-       //error handling ...
-       //TBD
-       printk("TP upgrade fail.\n");
-   }
-   else
-   {
-	fts_ctpm_auto_clb();
-   }
-
-   return i_ret;
-}
-
 int fts_ctpm_fw_upgrade_with_i_file2(void)
 {
    FTS_BYTE*     pbt_buf = FTS_NULL;
@@ -767,7 +739,6 @@ static int ft5x0x_read_data(void)
 
 	u8 buf[62] = {0};
 	int ret = -1;
-	unsigned char threshold_value;
 
 #ifdef CONFIG_FT5X0X_MULTITOUCH
         ret = ft5x0x_i2c_rxdata(buf, 7);
@@ -883,7 +854,7 @@ static int ft5x0x_read_data(void)
 	event->x1 = (s16)(buf[5] & 0x0F)<<8 | (s16)buf[6];
     }
 #endif
-    event->pressure = 50;
+    event->pressure = 200;
 
 	dev_dbg(&this_client->dev, "%s: 1:%d %d 2:%d %d \n", __func__,
 		event->x1, event->y1, event->x2, event->y2);
@@ -1244,7 +1215,6 @@ ft5x0x_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	{
 		if( uc_reg_value == 0xff)
 		{
-			gpio_free(ft5x0x_reset_pin);
 			goto  exit_check_functionality_failed;
 		}
 	}
@@ -1253,8 +1223,12 @@ ft5x0x_ts_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	{
           /* compare to last version, if not equal,do update!*/
           #if defined(CONFIG_BQ_MAXWELL2PLUS)
-          	if(( uc_reg_value == 0x52))
+          	if(( uc_reg_value < 0x58) && ( uc_reg_value > 0x50))
+          	 { 
+          	/* 0x53 is a special version*/ 	
+		    if(uc_reg_value != 0x53)
 		    fts_ctpm_fw_upgrade_with_i_file3();
+        }
 		/* version is 0xa6 means upgrade failed last time */
 		if( uc_reg_value == 0xa6)
 		    fts_ctpm_fw_upgrade_with_i_file3();

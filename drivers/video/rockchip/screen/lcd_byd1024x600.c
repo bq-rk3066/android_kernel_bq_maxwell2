@@ -8,12 +8,12 @@
 
 /* Base */
 #define SCREEN_TYPE		SCREEN_RGB
-#if defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 #define LVDS_FORMAT		LVDS_8BIT_2
 #else
 #define LVDS_FORMAT		LVDS_8BIT_1
 #endif
-#if defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 #define OUT_FACE		OUT_D888_P666
 #else
 #define OUT_FACE		OUT_P888
@@ -47,7 +47,7 @@
 #define LCD_WIDTH       	153    //need modify
 #define LCD_HEIGHT      	90
 
-#if defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 #define USE_RK_DSP_LUT
 int dsp_lut[256] ={
 		0x00000000, 0x00010101, 0x00020202, 0x00030303, 0x00040404, 0x00050505, 0x00060606, 0x00070707,

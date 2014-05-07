@@ -9,6 +9,9 @@ config ARCH_RK3066B
 config BQ_MAXWELL2LITE
 	bool "BQ Maxwell 2 Lite"
 
+config BQ_MAXWELL2
+	bool "BQ Maxwell 2"
+
 config BQ_MAXWELL2PLUS
 	bool "BQ Maxwell 2 Plus"
 

@@ -47,7 +47,7 @@
 #define RT5631_SPK_TIMER	1	//if enable this, MUST enable RT5631_EQ_FUNC_ENA first!
 #if defined(CONFIG_FOR_CE)
 #define RT5631_HP_RECORD_TIMER	0	//if enable this, MUST enable RT5631_EQ_FUNC_ENA first!
-#elif defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE)
+#elif defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 #define RT5631_HP_RECORD_TIMER	1	//if enable this, MUST enable RT5631_EQ_FUNC_ENA first!
 #else
 #define RT5631_HP_RECORD_TIMER	0	//if enable this, MUST enable RT5631_EQ_FUNC_ENA first!
@@ -186,7 +186,7 @@ struct rt5631_init_reg {
 #define DEF_VOL					0xc5//0xd4 -30dB 0xc0 0dB
 #endif
 #ifndef DEF_VOL_SPK
-#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 #define DEF_VOL_SPK				0xcb
 #else
 #define DEF_VOL_SPK				0xca
@@ -214,7 +214,7 @@ static struct rt5631_init_reg init_list[] = {
 	{RT5631_HP_OUT_VOL		, (DEF_VOL<<8) | DEF_VOL},//Headphone channel volume select OUTMIXER,0DB by default
 	{RT5631_MONO_AXO_1_2_VOL	, 0xE0c0},//AXO1/AXO2 channel volume select OUTMIXER,0DB by default
 	//{RT5631_STEREO_DAC_VOL_1	, 0x004C},
-#if defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 	{RT5631_STEREO_DAC_VOL_2	, 0x0808},
 #else
 	{RT5631_STEREO_DAC_VOL_2	, 0x0000},
@@ -241,12 +241,12 @@ static struct rt5631_init_reg init_list[] = {
 	{RT5631_AXO1MIXER_CTRL		, 0x8840},//OutMixer_L-->AXO1Mixer by default
 	{RT5631_AXO2MIXER_CTRL		, 0x8880},//OutMixer_R-->AXO2Mixer by default
 	{RT5631_SPK_MIXER_CTRL		, 0xd8d8},//DAC-->SpeakerMixer
-#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 	{RT5631_SPK_MONO_OUT_CTRL	, 0x3c00},//Speaker volume-->SPOMixer(L-->L,R-->L)
 #else
 	{RT5631_SPK_MONO_OUT_CTRL	, 0x6c00},//Speaker volume-->SPOMixer(L-->L,R-->R)
 #endif
-#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 	{RT5631_GEN_PUR_CTRL_REG	, 0x4e00},//Speaker AMP ratio gain is 1.09x
 #else
 	{RT5631_GEN_PUR_CTRL_REG	, 0x4e00},//Speaker AMP ratio gain is 1.27x
@@ -260,7 +260,7 @@ static struct rt5631_init_reg init_list[] = {
 	{RT5631_INT_ST_IRQ_CTRL_2	, 0x4f18},//enable HP zero cross
 	{RT5631_MIC_CTRL_1		, 0x8000},//set mic 1 to differnetial mode
 	{RT5631_GPIO_CTRL		, 0x0000},//set GPIO to input pin	
-#if defined(CONFIG_BQ_MAXWELL2PLUS)
+#if defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2PLUS)
 	{RT5631_JACK_DET_CTRL		, 0x4e80},//Jack detect for GPIO,high is hp,low is speaker
 #else
 	{RT5631_JACK_DET_CTRL		, 0x4bc0},//Jack detect for GPIO,high is speaker,low is hp
@@ -490,7 +490,7 @@ static int rt5631_eq_sel_put(struct snd_kcontrol *kcontrol,
 static void spk_work_handler(struct work_struct *work)
 {
 	struct snd_soc_codec *codec = rt5631_codec;
-#if defined(CONFIG_BQ_MAXWELL2PLUS)
+#if defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2PLUS)
 	bool is_spk = !((rt5631_read(codec, 0x4a)) & 0x04);	//detect rt5631 reg4a[3], 0'b:SPK, 1'b:HP ;
 #else
 	bool is_spk = (rt5631_read(codec, 0x4a)) & 0x04;	//detect rt5631 reg4a[3], 1'b:SPK, 0'b:HP ;
@@ -582,7 +582,7 @@ static void get_hp_record_status(struct snd_soc_codec  *codec)
 //	printk("++++++ value = %x,hp_record_status=%d\n",value,hp_record_status);
 
 	value = value & 0x3fff; //bard 10-9
-#if defined(CONFIG_BQ_MAXWELL2PLUS)
+#if defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2PLUS)
 	if(value==0xf1c)//get value of codec gpio,high show hp insert
 #else
 	if(value==0xf10)//get value of codec gpio,low show hp insert
@@ -791,7 +791,7 @@ static int spk_event(struct snd_soc_dapm_widget *w,
 	struct snd_soc_codec *codec = w->codec;
 	static int spkl_out_enable, spkr_out_enable;
 
-#if defined(CONFIG_BQ_MAXWELL2PLUS)
+#if defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2PLUS)
 	bool is_spk = !((rt5631_read(codec, 0x4a)) & 0x04); //detect rt5631 reg4a[3], 0'b:SPK, 1'b:HP ;
 #else
 	bool is_spk = (rt5631_read(codec, 0x4a)) & 0x04;	//detect rt5631 reg4a[3], 1'b:SPK, 0'b:HP ;
@@ -1002,7 +1002,7 @@ static int hp_event(struct snd_soc_dapm_widget *w,
 	static bool hp_en;
 	int pu_l, pu_r;
 
-#if defined(CONFIG_BQ_MAXWELL2PLUS)
+#if defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2PLUS)
 	bool is_spk = !((rt5631_read(codec, 0x4a)) & 0x04);	//detect rt5631 reg4a[3], 0'b:SPK, 1'b:HP ;
 #else
 	bool is_spk = (rt5631_read(codec, 0x4a)) & 0x04;	//detect rt5631 reg4a[3], 1'b:SPK, 0'b:HP ;
@@ -2303,6 +2303,9 @@ static int rt5631_probe(struct snd_soc_codec *codec)
 
 	INIT_WORK(&spk_work, spk_work_handler);
 #endif
+#if defined(CONFIG_BQ_MAXWELL2)
+	bool is_spk = !((rt5631_read(codec, 0x4a)) & 0x04);	//detect rt5631 reg4a[3], 0'b:SPK, 1'b:HP ;
+#else
 	bool is_spk = (rt5631_read(codec, 0x4a)) & 0x04;	//detect rt5631 reg4a[3], 1'b:SPK, 0'b:HP ;
 	switch_set_state(&g_rt5631->headset_sdev,( (is_spk == false) ? 1 : 0));
 /*
@@ -2431,7 +2434,7 @@ void codec_set_spk(bool on)
 	mutex_lock(&codec->mutex);
 	if(on){
 		DBG("inter spk open\n");
-#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2PLUS) || defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2)
 		rt5631_write_mask(rt5631_codec, RT5631_SPK_MONO_OUT_CTRL, 0x3c00, 0xfc00);
 #else
 		rt5631_write_mask(rt5631_codec, RT5631_SPK_MONO_OUT_CTRL, 0x6c00, 0xfc00);

@@ -30,6 +30,9 @@ config LOGO_LINUX_CLUT224
 config LOGO_MAXWELL2LITE_CLUT224
         bool "Standard 224-color Maxwell 2 Lite logo"
 
+config LOGO_MAXWELL2_CLUT224
+        bool "Standard 224-color Maxwell 2 logo"
+
 config LOGO_MAXWELL2PLUS_CLUT224
         bool "Standard 224-color Maxwell 2 Plus logo"
 

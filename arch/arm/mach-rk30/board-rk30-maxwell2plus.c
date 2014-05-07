@@ -321,7 +321,7 @@ static struct rk29_bl_info rk29_bl_info = {
 	.io_deinit = rk29_backlight_io_deinit,
 	.pwm_suspend = rk29_backlight_pwm_suspend,
 	.pwm_resume = rk29_backlight_pwm_resume,
-#if defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2PLUS)
+#if defined(CONFIG_BQ_MAXWELL2LITE) || defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2PLUS)
 	.min_brightness = 15,
 #endif
 };
@@ -506,7 +506,7 @@ static int mma7660_init_platform_hw(void)
 	return 0;
 }
 
-#if defined(CONFIG_BQ_MAXWELL2LITE)
+#if defined(CONFIG_BQ_MAXWELL2) || defined(CONFIG_BQ_MAXWELL2LITE)
 static struct sensor_platform_data mma7660_info = {
 	.type = SENSOR_TYPE_ACCEL,
 	.irq_enable = 1,
@@ -1725,6 +1725,11 @@ static void __init machine_rk30_board_init(void)
 
 #if defined(CONFIG_WIFI_CONTROL_FUNC)
 	rk29sdk_wifi_bt_gpio_control_init();
+#endif
+
+#if defined(CONFIG_BQ_MAXWELL2)
+	gpio_pull_updown(RK30_PIN4_PC4, PullDisable);
+	gpio_direction_input(RK30_PIN4_PC4);
 #endif
 }
 

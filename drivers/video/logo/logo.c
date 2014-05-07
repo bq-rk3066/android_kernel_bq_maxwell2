@@ -88,6 +88,10 @@ const struct linux_logo * __init_refok fb_find_logo(int depth)
                 /* Maxwell 2 Lite logo */
                 logo = &logo_maxwell2lite_clut224;
 #endif
+#ifdef CONFIG_LOGO_MAXWELL2_CLUT224
+                /* Maxwell 2 logo */
+                logo = &logo_maxwell2_clut224;
+#endif
 #ifdef CONFIG_LOGO_MAXWELL2PLUS_CLUT224
                 /* Maxwell 2 Plus logo */
                 logo = &logo_maxwell2plus_clut224;
